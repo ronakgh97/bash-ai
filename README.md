@@ -2,7 +2,7 @@
 
 A powerful command-line tool for API interaction featuring authentication, session management, and real-time chat with AI thinking visualization.
 
-[![npm version](https://badge.fury.io/js/@yourusername%2Fapi-cli.svg)](https://www.npmjs.com/package/@yourusername/api-cli)
+[![npm version](https://badge.fury.io/js/@yourusername%2Fapi-cli.svg)](https://www.npmjs.com/package/@ronakgh97/api-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## ✨ Features
@@ -18,12 +18,12 @@ A powerful command-line tool for API interaction featuring authentication, sessi
 ## 🚀 Installation
 
 ### Global Installation (Recommended)
-npm install -g @yourusername/api-cli
+npm install -g @ronakgh97/api-cli
 
 text
 
 ### One-time Usage
-npx @yourusername/api-cli help
+npx @ronakgh97/api-cli help
 
 text
 
@@ -165,7 +165,7 @@ text
 
 ### API Endpoint
 
-**Default**: The CLI connects to `https://c22b67b1d2ec.ngrok-free.app/api/v1`
+**Default**: The CLI connects to `https://servertest.ronakratnadip.xyz/api/v1`
 
 **No configuration needed!** Just install and start using immediately.
 
@@ -261,7 +261,7 @@ text
 ## 🛠️ Development
 
 ### Local Development
-git clone https://github.com/yourusername/api-cli.git
+git clone https://github.com/ronakgh97/bash-api-test.git
 cd api-cli
 chmod +x bin/cli.sh
 
