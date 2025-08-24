@@ -2,7 +2,7 @@
 
 A powerful command-line tool for API interaction featuring authentication, session management, and real-time chat with AI thinking visualization.
 
-[![npm version](https://badge.fury.io/js/@yourusername%2Fapi-cli.svg)](https://www.npmjs.com/package/@ronakgh97/api-cli)
+[![npm version](https://badge.fury.io/js/@yourusername%2Fapi-cli.svg)](https://www.npmjs.com/package/@ronakgh97/bash-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## ✨ Features
@@ -18,12 +18,12 @@ A powerful command-line tool for API interaction featuring authentication, sessi
 ## 🚀 Installation
 
 ### Global Installation (Recommended)
-npm install -g @ronakgh97/api-cli
+npm install -g @ronakgh97/bash-cli
 
 text
 
 ### One-time Usage
-npx @ronakgh97/api-cli help
+npx @ronakgh97/bash-cli help
 
 text
 
@@ -64,57 +64,57 @@ Use WSL (Windows Subsystem for Linux) or Git Bash
    api-cli user create myusername mypassword myemail@example.com
 
 2. Login
-   api-cli login myusername mypassword
+   bash-cli login myusername mypassword
 
 3. Verify your account (check your email)
-   api-cli verify send
-   api-cli verify check 123456
+   bash-cli verify send
+   bash-cli verify check 123456
 
 4. Create a chat session
-   api-cli session create "My First Chat"
+   bash-cli session create "My First Chat"
 
 5. Start chatting with AI
-   api-cli chat "Hello! How are you today?"
+   bash-cli chat "Hello! How are you today?"
 
 6. Check your status
-   api-cli status
+   bash-cli status
 
 text
 
 ## 📚 Commands Reference
 
 ### 👤 User Management
-api-cli user create [username] [password] [email] # Register new user
-api-cli user profile # View user profile
-api-cli login [username] [password] # Login to account
-api-cli logout # Logout and clear data
+bash-cli user create [username] [password] [email] # Register new user
+bash-cli user profile # View user profile
+bash-cli login [username] [password] # Login to account
+bash-cli logout # Logout and clear data
 
 text
 
 ### 📧 Email Verification
-api-cli verify send # Send verification code to email
-api-cli verify check <code> # Verify account with received code
+bash-cli verify send # Send verification code to email
+bash-cli verify check <code> # Verify account with received code
 
 text
 
 ### 🗂️ Session Management
-api-cli session create [name] [model] # Create new chat session
-api-cli session list # List all your sessions
-api-cli session switch <session_id> # Switch to different session
-api-cli session current # Show current active session
+bash-cli session create [name] [model] # Create new chat session
+bash-cli session list # List all your sessions
+bash-cli session switch <session_id> # Switch to different session
+bash-cli session current # Show current active session
 
 text
 
 ### 💬 Chat
-api-cli chat "your message here" # Send message to AI
+bash-cli chat "your message here" # Send message to AI
 
 text
 
 ### 🔧 Utilities
-api-cli status # Show login and session status
-api-cli health # Check API connectivity
-api-cli help # Show help information
-api-cli version # Show version number
+bash-cli status # Show login and session status
+bash-cli health # Check API connectivity
+bash-cli help # Show help information
+bash-cli version # Show version number
 
 text
 
