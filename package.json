@@ -1,0 +1,53 @@
+{
+  "name": "@ronakgh97/bash-cli",
+  "version": "1.8.8",
+  "description": "Command-line client for API interaction with authentication, sessions, and real-time chat",
+  "keywords": [
+    "cli",
+    "api",
+    "chat",
+    "authentication",
+    "sessions",
+    "bash",
+    "terminal",
+    "ngrok"
+  ],
+  "author": "ronakgh97@gmail.com",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/api-cli.git"
+  },
+  "homepage": "https://github.com/yourusername/api-cli#readme",
+  "bugs": {
+    "url": "https://github.com/yourusername/api-cli/issues"
+  },
+  "bin": {
+    "api-cli": "./bin/cli.sh"
+  },
+  "main": "./bin/cli.sh",
+  "files": [
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "bash -n bin/cli.sh",
+    "lint": "shellcheck bin/cli.sh || echo 'shellcheck not installed - skipping'",
+    "prepack": "chmod +x bin/cli.sh",
+    "postinstall": "echo 'Thanks for installing api-cli! Run: api-cli help to get started'"
+  },
+  "engines": {
+    "node": ">=12.0.0"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "preferGlobal": true,
+  "dependencies": {},
+  "devDependencies": {
+    "shellcheck": "^0.9.0"
+  }
+}
+

@@ -1,0 +1,588 @@
+#!/usr/bin/env bash
+
+# API CLI - A command-line tool for API interaction
+# Version: 1.0.0
+
+# Configuration - Default to ngrok deployment, allow override
+BASE_URL="${API_URL:-https://servertest.ronakratnadip.xyz/api/v1}"
+TOKEN_FILE="${HOME}/.api-cli-token"
+SESSION_FILE="${HOME}/.api-cli-session"
+SESSIONS_DIR="${HOME}/.api-cli-sessions"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+GRAY='\033[0;90m'
+NC='\033[0m'
+
+# Version
+VERSION="1.8.8"
+
+# Logging functions
+log_info() { echo -e "${BLUE} $1${NC}"; }
+log_success() { echo -e "${GREEN}👍 $1${NC}"; }
+log_warning() { echo -e "${YELLOW}🙌 $1${NC}"; }
+log_error() { echo -e "${RED}👎 $1${NC}"; }
+
+# Check dependencies
+check_dependencies() {
+    echo "Checking dependencies"
+    local missing=()
+    command -v curl >/dev/null || missing+=("curl")
+    command -v jq >/dev/null || missing+=("jq")
+
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        log_error "Missing required dependencies: ${missing[*]}"
+        echo ""
+        echo "Install with:"
+        echo "  macOS:        brew install ${missing[*]}"
+        echo "  Ubuntu:       sudo apt install ${missing[*]}"
+        echo "  CentOS/RHEL:  sudo yum install ${missing[*]}"
+        echo ""
+        exit 1
+    fi
+}
+
+# Utility functions
+get_token() { [[ -f "$TOKEN_FILE" ]] && cat "$TOKEN_FILE" || echo ""; }
+save_token() { echo -n "$1" > "$TOKEN_FILE"; chmod 600 "$TOKEN_FILE" 2>/dev/null || true; }
+clear_token() { rm -f "$TOKEN_FILE"; }
+
+get_current_session() { [[ -f "$SESSION_FILE" ]] && cat "$SESSION_FILE" || echo ""; }
+save_current_session() { echo -n "$1" > "$SESSION_FILE"; chmod 600 "$SESSION_FILE" 2>/dev/null || true; }
+clear_current_session() { rm -f "$SESSION_FILE"; }
+
+# Initialize sessions directory
+init_sessions_dir() {
+    [[ ! -d "$SESSIONS_DIR" ]] && mkdir -p "$SESSIONS_DIR" && chmod 700 "$SESSIONS_DIR"
+}
+
+# Save session details locally
+save_session_details() {
+    local session_id="$1"
+    local session_name="$2"
+    local model="$3"
+    init_sessions_dir
+    echo "{\"sessionId\":\"$session_id\",\"name\":\"$session_name\",\"model\":\"$model\",\"created\":\"$(date -Iseconds)\"}" > "$SESSIONS_DIR/$session_id.json"
+    chmod 600 "$SESSIONS_DIR/$session_id.json"
+}
+
+# Check dependencies on startup
+check_dependencies
+
+CMD=$1; shift
+
+case "$CMD" in
+    help|--help|-h|"")
+        cat << 'EOF'
+API CLI - A command-line tool for API interaction
+
+USAGE:
+    api-cli <command> [options]
+
+COMMANDS:
+    User Management:
+        user create [username] [password] [email]   Register new user
+        user profile                                View user profile
+        login [username] [password]                 Login to account
+        logout                                      Logout and clear data
+
+    Email Verification:
+        verify send                                 Send verification code
+        verify check <code>                         Verify with received code
+
+    Session Management:
+        session create [name] [model]               Create new session
+        session list                                List all sessions
+        session switch <session_id>                 Switch active session
+        session current                             Show current session
+
+    Chat:
+        chat "message"                              Send message to AI
+
+    Utilities:
+        status                                      Show current status
+        health                                      Check API health
+        help                                        Show this help
+        version                                     Show version
+
+EXAMPLES:
+    api-cli user create alice password123 alice@example.com
+    api-cli session create "Work Chat" "gpt-4"
+    api-cli chat "Hello, how are you today?"
+    api-cli session list
+
+CONFIGURATION:
+    Environment Variables:
+        API_URL     Override default API endpoint
+                    Default: https://servertest.ronakratnadip.xyz/api/v1
+                    Example: export API_URL=https://your-api.com/api/v1
+
+    Data Files (stored in home directory):
+        ~/.api-cli-token        Authentication token
+        ~/.api-cli-session      Current session ID
+        ~/.api-cli-sessions/    Session metadata
+
+REQUIREMENTS:
+    - curl command (for HTTP requests)
+    - jq command (for JSON processing)
+    - Bash shell
+
+For more information: https://github.com/yourusername/api-cli
+EOF
+        ;;
+
+    version|--version|-v)
+        echo "api-cli version $VERSION"
+        ;;
+
+    user)
+        SUB=$1; shift
+        case "$SUB" in
+            create)
+                USERNAME=${1:-demo}
+                PASSWORD=${2:-123456}
+                GMAIL=${3:-demo@example.com}
+
+                log_info "Registering user: $USERNAME <$GMAIL>"
+                RESPONSE=$(curl -s -X POST "$BASE_URL/users/register" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"userName\":\"$USERNAME\",\"password\":\"$PASSWORD\",\"gmail\":\"$GMAIL\"}")
+
+                if echo "$RESPONSE" | jq -e '.success == true' >/dev/null 2>&1; then
+                    USER_DATA=$(echo "$RESPONSE" | jq -r '.data')
+                    USER_ID=$(echo "$USER_DATA" | jq -r '.userId')
+                    SESSION_COUNT=$(echo "$USER_DATA" | jq -r '.sessionCount')
+                    IS_VERIFIED=$(echo "$USER_DATA" | jq -r '.isVerified')
+
+                    log_success "User created successfully!"
+                    echo -e "${CYAN}User ID:${NC} $USER_ID"
+                    echo -e "${CYAN}Sessions:${NC} $SESSION_COUNT"
+                    echo -e "${CYAN}Verified:${NC} $IS_VERIFIED"
+
+                    if [[ "$IS_VERIFIED" == "false" ]]; then
+                        log_warning "Account not verified. Use: api-cli verify send"
+                    fi
+                else
+                    log_error "Registration failed"
+                    echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
+                    exit 1
+                fi
+                ;;
+
+            profile)
+                TOKEN=$(get_token)
+                [[ -z "$TOKEN" ]] && log_error "Not logged in!" && exit 1
+
+                log_info "Getting user profile..."
+                RESPONSE=$(curl -s -X GET "$BASE_URL/users/profile" \
+                    -H "Authorization: Bearer $TOKEN" \
+                    -H "Content-Type: application/json")
+
+                if echo "$RESPONSE" | jq -e '.success == true' >/dev/null 2>&1; then
+                    USER_DATA=$(echo "$RESPONSE" | jq -r '.data')
+                    USERNAME=$(echo "$USER_DATA" | jq -r '.userName')
+                    GMAIL=$(echo "$USER_DATA" | jq -r '.gmail')
+                    USER_ID=$(echo "$USER_DATA" | jq -r '.userId')
+                    SESSION_COUNT=$(echo "$USER_DATA" | jq -r '.sessionCount')
+                    IS_VERIFIED=$(echo "$USER_DATA" | jq -r '.isVerified')
+                    ROLES=$(echo "$USER_DATA" | jq -r '.roles | join(", ")')
+
+                    echo "=== User Profile ==="
+                    echo -e "${CYAN}Username:${NC} $USERNAME"
+                    echo -e "${CYAN}Email:${NC} $GMAIL"
+                    echo -e "${CYAN}User ID:${NC} $USER_ID"
+                    echo -e "${CYAN}Sessions:${NC} $SESSION_COUNT"
+                    echo -e "${CYAN}Verified:${NC} $IS_VERIFIED"
+                    echo -e "${CYAN}Roles:${NC} $ROLES"
+                else
+                    log_error "Failed to get profile"
+                    echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
+                    exit 1
+                fi
+                ;;
+
+            *)
+                log_error "Unknown user subcommand: $SUB"
+                echo "Available: create, profile"
+                exit 1
+                ;;
+        esac
+        ;;
+
+    login)
+        USERNAME=${1:-demo}
+        PASSWORD=${2:-123456}
+
+        log_info "Logging in as $USERNAME"
+        RESPONSE=$(curl -s -X POST "$BASE_URL/users/login" \
+            -H "Content-Type: application/json" \
+            -d "{\"userName\":\"$USERNAME\",\"password\":\"$PASSWORD\"}")
+
+        if echo "$RESPONSE" | jq -e '.success == true' >/dev/null 2>&1; then
+            TOKEN=$(echo "$RESPONSE" | jq -r '.data.token')
+            USER_DATA=$(echo "$RESPONSE" | jq -r '.data.user')
+            USERNAME=$(echo "$USER_DATA" | jq -r '.userName')
+            SESSION_COUNT=$(echo "$USER_DATA" | jq -r '.sessionCount')
+            IS_VERIFIED=$(echo "$USER_DATA" | jq -r '.isVerified')
+
+            save_token "$TOKEN"
+            log_success "Login successful"
+            echo -e "${CYAN}Welcome:${NC} $USERNAME"
+            echo -e "${CYAN}Sessions:${NC} $SESSION_COUNT"
+            echo -e "${CYAN}Verified:${NC} $IS_VERIFIED"
+
+            if [[ "$IS_VERIFIED" == "false" ]]; then
+                log_warning "Account not verified. Use: api-cli verify send"
+            fi
+        else
+            log_error "Login failed"
+            echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
+            exit 1
+        fi
+        ;;
+
+    logout)
+        clear_token
+        clear_current_session
+        rm -rf "$SESSIONS_DIR" 2>/dev/null
+        log_success "Logged out and cleared all local data"
+        ;;
+
+    verify)
+        SUB=$1; shift
+        TOKEN=$(get_token)
+        [[ -z "$TOKEN" ]] && log_error "Not logged in!" && exit 1
+
+        case "$SUB" in
+            send)
+                log_info "Sending verification code..."
+                RESPONSE=$(curl -s -X GET "$BASE_URL/verify/send" \
+                    -H "Authorization: Bearer $TOKEN" \
+                    -H "Content-Type: application/json")
+
+                if echo "$RESPONSE" | jq -e '.success == true' >/dev/null 2>&1; then
+                    MESSAGE=$(echo "$RESPONSE" | jq -r '.message')
+                    log_success "$MESSAGE"
+                else
+                    log_error "Failed to send verification code"
+                    echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
+                    exit 1
+                fi
+                ;;
+
+            check)
+                CODE="$1"
+                [[ -z "$CODE" ]] && log_error "Usage: api-cli verify check <code>" && exit 1
+
+                log_info "Verifying code: $CODE"
+                RESPONSE=$(curl -s -X POST "$BASE_URL/verify/check/$CODE" \
+                    -H "Authorization: Bearer $TOKEN" \
+                    -H "Content-Type: application/json")
+
+                if echo "$RESPONSE" | jq -e '.success == true' >/dev/null 2>&1; then
+                    MESSAGE=$(echo "$RESPONSE" | jq -r '.message')
+                    log_success "$MESSAGE"
+                else
+                    log_error "Verification failed"
+                    echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
+                    exit 1
+                fi
+                ;;
+
+            *)
+                log_error "Unknown verify subcommand: $SUB"
+                echo "Available: send, check"
+                exit 1
+                ;;
+        esac
+        ;;
+
+    session)
+        SUB=$1; shift
+        TOKEN=$(get_token)
+        [[ -z "$TOKEN" ]] && log_error "Not logged in!" && exit 1
+
+        case "$SUB" in
+            create)
+                SESSION_NAME=${1:-"session-$(date +%H%M%S)"}
+                MODEL=${2:-"qwen/qwen3-4b-thinking-2507"}
+
+                log_info "Creating session: $SESSION_NAME with model: $MODEL"
+                RESPONSE=$(curl -s -X POST "$BASE_URL/sessions/create" \
+                    -H "Authorization: Bearer $TOKEN" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"nameSession\":\"$SESSION_NAME\",\"model\":\"$MODEL\"}")
+
+                if echo "$RESPONSE" | jq -e '.success == true' >/dev/null 2>&1; then
+                    SESSION_DATA=$(echo "$RESPONSE" | jq -r '.data')
+                    SESSION_ID=$(echo "$SESSION_DATA" | jq -r '.sessionId')
+                    SESSION_NAME=$(echo "$SESSION_DATA" | jq -r '.nameSession')
+                    MODEL=$(echo "$SESSION_DATA" | jq -r '.model')
+                    DATETIME=$(echo "$SESSION_DATA" | jq -r '.dateTime')
+
+                    save_session_details "$SESSION_ID" "$SESSION_NAME" "$MODEL"
+                    save_current_session "$SESSION_ID"
+
+                    log_success "Session created and activated!"
+                    echo -e "${CYAN}Session ID:${NC} $SESSION_ID"
+                    echo -e "${CYAN}Name:${NC} $SESSION_NAME"
+                    echo -e "${CYAN}Model:${NC} $MODEL"
+                    echo -e "${CYAN}Created:${NC} $DATETIME"
+                else
+                    log_error "Session creation failed"
+                    echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
+                    exit 1
+                fi
+                ;;
+
+            list)
+                log_info "Fetching sessions from server..."
+                RESPONSE=$(curl -s -X GET "$BASE_URL/sessions" \
+                    -H "Authorization: Bearer $TOKEN" \
+                    -H "Content-Type: application/json")
+
+                if echo "$RESPONSE" | jq -e '.success == true' >/dev/null 2>&1; then
+                    current_session=$(get_current_session)
+                    echo "=== Your Sessions ==="
+
+                    SESSIONS=$(echo "$RESPONSE" | jq -r '.data')
+                    SESSION_COUNT=$(echo "$SESSIONS" | jq length)
+
+                    if [[ "$SESSION_COUNT" -gt 0 ]]; then
+                        echo "$SESSIONS" | jq -r '.[] | @json' | while read -r session; do
+                            session_id=$(echo "$session" | jq -r '.sessionId')
+                            session_name=$(echo "$session" | jq -r '.nameSession')
+                            model=$(echo "$session" | jq -r '.model')
+                            datetime=$(echo "$session" | jq -r '.dateTime')
+                            message_count=$(echo "$session" | jq -r '.messageCount')
+
+                            if [[ "$session_id" == "$current_session" ]]; then
+                                echo -e "${GREEN}▶ $session_name${NC} (${CYAN}$session_id${NC})"
+                            else
+                                echo -e "  $session_name (${GRAY}$session_id${NC})"
+                            fi
+                            echo -e "    Model: $model | Messages: $message_count | Created: $datetime"
+                        done
+                    else
+                        log_warning "No sessions found"
+                    fi
+                else
+                    log_error "Failed to fetch sessions"
+                    echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
+                fi
+                ;;
+
+            switch)
+                SESSION_ID="$1"
+                [[ -z "$SESSION_ID" ]] && log_error "Usage: api-cli session switch <session_id>" && exit 1
+
+                # Verify session exists on server
+                RESPONSE=$(curl -s -X GET "$BASE_URL/sessions" \
+                    -H "Authorization: Bearer $TOKEN" \
+                    -H "Content-Type: application/json")
+
+                if echo "$RESPONSE" | jq -e '.success == true' >/dev/null 2>&1; then
+                    SESSION_EXISTS=$(echo "$RESPONSE" | jq -r --arg sid "$SESSION_ID" '.data[] | select(.sessionId == $sid) | .sessionId')
+
+                    if [[ -n "$SESSION_EXISTS" ]]; then
+                        SESSION_NAME=$(echo "$RESPONSE" | jq -r --arg sid "$SESSION_ID" '.data[] | select(.sessionId == $sid) | .nameSession')
+                        save_current_session "$SESSION_ID"
+                        log_success "Switched to session: $SESSION_NAME ($SESSION_ID)"
+                    else
+                        log_error "Session not found: $SESSION_ID"
+                        exit 1
+                    fi
+                else
+                    log_error "Failed to verify session"
+                    exit 1
+                fi
+                ;;
+
+            current)
+                current_session=$(get_current_session)
+                if [[ -n "$current_session" ]]; then
+                    # Get session details from server
+                    RESPONSE=$(curl -s -X GET "$BASE_URL/sessions" \
+                        -H "Authorization: Bearer $TOKEN" \
+                        -H "Content-Type: application/json")
+
+                    if echo "$RESPONSE" | jq -e '.success == true' >/dev/null 2>&1; then
+                        SESSION_DATA=$(echo "$RESPONSE" | jq -r --arg sid "$current_session" '.data[] | select(.sessionId == $sid)')
+
+                        if [[ -n "$SESSION_DATA" && "$SESSION_DATA" != "null" ]]; then
+                            session_name=$(echo "$SESSION_DATA" | jq -r '.nameSession')
+                            model=$(echo "$SESSION_DATA" | jq -r '.model')
+                            message_count=$(echo "$SESSION_DATA" | jq -r '.messageCount')
+
+                            echo -e "${GREEN}Current Session:${NC}"
+                            echo -e "  ${CYAN}Name:${NC} $session_name"
+                            echo -e "  ${CYAN}ID:${NC} $current_session"
+                            echo -e "  ${CYAN}Model:${NC} $model"
+                            echo -e "  ${CYAN}Messages:${NC} $message_count"
+                        else
+                            log_warning "Current session not found on server"
+                            clear_current_session
+                        fi
+                    else
+                        log_error "Failed to get session details"
+                    fi
+                else
+                    log_warning "No active session"
+                fi
+                ;;
+
+            *)
+                log_error "Unknown session subcommand: $SUB"
+                echo "Available: create, list, switch, current"
+                exit 1
+                ;;
+        esac
+        ;;
+
+    chat)
+        PROMPT="$*"
+        [[ -z "$PROMPT" ]] && log_error "Usage: api-cli chat \"message\"" && exit 1
+
+        TOKEN=$(get_token)
+        SESSION_ID=$(get_current_session)
+        [[ -z "$TOKEN" ]] && log_error "Not logged in" && exit 1
+        [[ -z "$SESSION_ID" ]] && log_error "No active session. Use: api-cli session list" && exit 1
+
+        # Get session name from server
+        RESPONSE=$(curl -s -X GET "$BASE_URL/sessions" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json")
+
+        SESSION_NAME="Unknown"
+        if echo "$RESPONSE" | jq -e '.success == true' >/dev/null 2>&1; then
+            SESSION_NAME=$(echo "$RESPONSE" | jq -r --arg sid "$SESSION_ID" '.data[] | select(.sessionId == $sid) | .nameSession // "Unknown"')
+        fi
+
+        echo -e "${BLUE}Session:${NC} $SESSION_NAME (${GRAY}$SESSION_ID${NC})"
+        echo -e "${BLUE}You:${NC} $PROMPT"
+        echo -e "${BLUE}Assistant:${NC}"
+        echo "--------------------------------"
+
+        buffer=""
+        thinking_mode=false
+        think_started=false
+
+        curl -sN --no-buffer -X POST "$BASE_URL/chat/$SESSION_ID" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "Accept: text/event-stream" \
+            -d "{\"prompt\":\"$PROMPT\"}" \
+        | while IFS= read -r line; do
+            if [[ "$line" =~ ^data:(.*)$ ]]; then
+                content="${BASH_REMATCH[1]}"
+                [[ -z "$content" ]] && continue
+
+                case "$content" in
+                    "<think>")
+                        [[ -n "$buffer" ]] && printf "%s" "$buffer"
+                        buffer=""
+                        thinking_mode=true
+                        think_started=false
+                        continue
+                        ;;
+                    "</think>")
+                        [[ -n "$buffer" ]] && printf "${GRAY}%s${NC}" "$buffer"
+                        buffer=""
+                        thinking_mode=false
+                        echo -e "\n${CYAN}--- End Thinking ---${NC}"
+                        continue
+                        ;;
+                esac
+
+                if [[ "$thinking_mode" == true ]]; then
+                    if [[ "$think_started" == false ]]; then
+                        echo -e "\n${CYAN}--- Thinking ---${NC}"
+                        think_started=true
+                    fi
+                    buffer+="$content"
+                    if [[ ${#buffer} -ge 8 ]] || [[ "$content" == " " ]]; then
+                        printf "${GRAY}%s${NC}" "$buffer"
+                        buffer=""
+                    fi
+                else
+                    buffer+="$content"
+                    if [[ ${#buffer} -ge 8 ]] || [[ "$content" == " " ]]; then
+                        printf "%s" "$buffer"
+                        buffer=""
+                    fi
+                fi
+            fi
+        done
+
+        if [[ -n "$buffer" ]]; then
+            if [[ "$thinking_mode" == true ]]; then
+                printf "${GRAY}%s${NC}" "$buffer"
+                echo -e "\n${CYAN}--- End Thinking ---${NC}"
+            else
+                printf "%s" "$buffer"
+            fi
+        fi
+
+        echo
+        echo "--------------------------------"
+        ;;
+
+    status)
+        TOKEN=$(get_token)
+        echo "=== Status ==="
+
+        if [[ -n "$TOKEN" ]]; then
+            RESPONSE=$(curl -s -X GET "$BASE_URL/users/profile" \
+                -H "Authorization: Bearer $TOKEN" \
+                -H "Content-Type: application/json")
+
+            if echo "$RESPONSE" | jq -e '.success == true' >/dev/null 2>&1; then
+                USER_DATA=$(echo "$RESPONSE" | jq -r '.data')
+                USERNAME=$(echo "$USER_DATA" | jq -r '.userName')
+                IS_VERIFIED=$(echo "$USER_DATA" | jq -r '.isVerified')
+                SESSION_COUNT=$(echo "$USER_DATA" | jq -r '.sessionCount')
+
+                log_success "Logged in as: $USERNAME"
+                echo -e "${CYAN}Verified:${NC} $IS_VERIFIED"
+                echo -e "${CYAN}Total Sessions:${NC} $SESSION_COUNT"
+            else
+                log_warning "Token may be invalid"
+            fi
+        else
+            log_warning "Not logged in"
+        fi
+
+        SESSION_ID=$(get_current_session)
+        [[ -n "$SESSION_ID" ]] && log_success "Active session: $SESSION_ID" || log_warning "No active session"
+        ;;
+
+    health)
+        log_info "Checking API health..."
+        if response=$(curl -s "$BASE_URL/health" 2>/dev/null); then
+            if command -v jq &> /dev/null; then
+                echo "$response" | jq --color-output '.' 2>/dev/null || echo "$response"
+            else
+                echo "$response"
+            fi
+            log_success "API is reachable at: $BASE_URL"
+        else
+            log_error "Unable to connect to API at: $BASE_URL"
+            echo ""
+            echo "Check if:"
+            echo "  1. API server is running"
+            echo "  2. Network connection is working"
+            echo "  3. URL is correct: $BASE_URL"
+            exit 1
+        fi
+        ;;
+
+    *)
+        log_error "Unknown command: $CMD"
+        echo "Use 'api-cli help' for usage information."
+        exit 1
+        ;;
+esac
