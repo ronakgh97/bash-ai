@@ -421,13 +421,13 @@ case "$CMD" in
                         think_started=true
                     fi
                     buffer+="$content"
-                    if [[ ${#buffer} -ge 8 ]] || [[ "$content" == " " ]]; then
+                    if [[ ${#buffer} -ge 4 ]] || [[ "$content" == " " ]]; then
                         printf "${GRAY}%s${NC}" "$buffer"
                         buffer=""
                     fi
                 else
                     buffer+="$content"
-                    if [[ ${#buffer} -ge 8 ]] || [[ "$content" == " " ]]; then
+                    if [[ ${#buffer} -ge 4 ]] || [[ "$content" == " " ]]; then
                         printf "%s" "$buffer"
                         buffer=""
                     fi
@@ -479,15 +479,10 @@ case "$CMD" in
 
     health)
         log_info "Checking API health..."
-        if response=$(curl -s "$BASE_URL/health" 2>/dev/null); then
-            if command -v jq &> /dev/null; then
-                echo "$response" | jq --color-output '.' 2>/dev/null || echo "$response"
-            else
-                #echo "$response"
-                echo "Server's up and running!!"
-            fi
+        if curl -s --fail "$BASE_URL/health" > /dev/null 2>&1; then
+            echo "✅ Server's up and running!!"
         else
-            log_error "Unable to connect to API"
+            log_error "❌ Unable to connect to API"
             exit 1
         fi
         ;;

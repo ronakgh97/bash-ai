@@ -15,7 +15,8 @@ if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
     echo "⚠️  ~/.local/bin is not in your PATH."
 
     # Offer to add automatically
-    read -p "Do you want me to add it to ~/.bashrc for you? (y/n) " yn
+    echo -n "Do you want me to add it to ~/.bashrc for you? (y/n) "
+    read -r yn
     case $yn in
         [Yy]* )
             echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"

@@ -58,9 +58,9 @@ Use WSL (Windows Subsystem for Linux) or Git Bash
 ## 📚 Commands Reference
 
 ### 👤 User Management
-spai user create [username] [password] [email] # Register new user
+spai user create username password email # Register new user
 spai user profile # View user profile
-spai login [username] [password] # Login to account
+spai login username password # Login to account
 spai logout # Logout and clear data
 
 
@@ -70,7 +70,7 @@ spai verify check <code> # Verify account with received code
 
 
 ### 🗂️ Session Management
-spai session create [name] [model] # Create new chat session
+spai session create name model # Create new chat session
 spai session list # List all your sessions
 spai session switch <session_id> # Switch to different session
 spai session current # Show current active session
