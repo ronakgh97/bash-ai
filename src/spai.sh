@@ -487,6 +487,13 @@ case "$CMD" in
         fi
         ;;
 
+    flush)
+        log_info "Flushing all local data..."
+        rm -f "$TOKEN_FILE" "$SESSION_FILE" 2>/dev/null || true
+        rm -rf "$SESSIONS_DIR" 2>/dev/null || true
+        log_success "All local SPAI data has been cleared."
+        ;;
+
     *)
         log_error "Unknown command: $CMD"
         echo "Usage:"
