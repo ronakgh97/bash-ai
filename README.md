@@ -6,9 +6,14 @@ A simple command-line tool for API interaction featuring authentication, session
 
 ## 🚀 Installation
 
-### Global Installation (Recommended)
+### Global Installation
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ronakgh97/bash-ai/master/install.sh | bash
+```
+
+### 🗑️ Uninstallation
+```bash
+curl -fsSL https://raw.githubusercontent.com/ronakgh97/bash-ai/master/uninstall.sh | bash
 ```
 
 ## 📋 Requirements
