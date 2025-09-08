@@ -14,9 +14,9 @@ echo "✅ Installed spai to $TARGET"
 if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
     echo "⚠️  ~/.local/bin is not in your PATH."
 
-    # Offer to add automatically
+    # Offer to add automatically (read from keyboard, not pipe)
     echo -n "Do you want me to add it to ~/.bashrc for you? (y/n) "
-    read -r yn
+    read -r yn < /dev/tty
     case $yn in
         [Yy]* )
             echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
@@ -28,5 +28,5 @@ if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
             ;;
     esac
 else
-    echo "🎉 ~/.local/bin is already in your PATH. You can run 'spai' now!"
+    echo " ~/.local/bin is already in your PATH. You can run 'spai' now!"
 fi

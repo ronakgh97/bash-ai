@@ -14,14 +14,14 @@ fi
 # Ask to remove PATH entry
 if grep -q 'export PATH="$HOME/.local/bin:$PATH"' "$HOME/.bashrc"; then
     echo -n "Do you want me to remove the PATH line from ~/.bashrc? (y/n) "
-    read -r yn
+    read -r yn < /dev/tty
     case $yn in
         [Yy]* )
             sed -i '/export PATH="\$HOME\/.local\/bin:\$PATH"/d' "$HOME/.bashrc"
             echo "✅ PATH entry removed from ~/.bashrc. Restart your terminal."
             ;;
         * )
-            echo "ℹ️ PATH entry left in ~/.bashrc"
+            echo " PATH entry left in ~/.bashrc"
             ;;
     esac
 fi
